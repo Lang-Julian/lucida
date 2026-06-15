@@ -75,5 +75,41 @@ for (let i = 0; i < 80; i++) scribble.push([noise(120) + 150, noise(120) + 150])
 const sc = recognizeStroke(scribble, { minConfidence: 0.6 });
 console.log(`ℹ️  scribble -> ${sc ? sc.type + " (conf " + sc.confidence.toFixed(2) + ")" : "null (good)"}`);
 
+// Fuzz: many noisy, rotated, varied-aspect ellipses must classify as ellipse,
+// NOT as a polygon. Regression guard for the 35°->55° corner threshold +
+// circularity-first fix (polygon-misclassification was ~18% before the fix).
+function noisyEllipse(rx: number, ry: number, rot: number, n: number, tremor: number): Point[] {
+  const pts: Point[] = [];
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2; // full loop -> closed
+    const ex = Math.cos(a) * rx + noise(tremor);
+    const ey = Math.sin(a) * ry + noise(tremor);
+    pts.push([300 + ex * cos - ey * sin, 300 + ex * sin + ey * cos]);
+  }
+  return pts;
+}
+let ellipses = 0;
+let polygonMisclassified = 0;
+const N = 400;
+for (let k = 0; k < N; k++) {
+  const rx = 45 + Math.abs(noise(70));
+  const ry = rx * (0.55 + Math.abs(noise(0.45)));
+  const r = recognizeStroke(
+    noisyEllipse(rx, ry, noise(Math.PI), 30 + Math.floor(Math.abs(noise(70))), 1.6),
+    { minConfidence: 0.5 },
+  );
+  if (r && r.type === "ellipse") ellipses++;
+  else if (r && (r.type === "rectangle" || r.type === "diamond" || r.type === "triangle")) polygonMisclassified++;
+}
+const misRate = polygonMisclassified / N;
+const fuzzOk = misRate <= 0.05;
+if (!fuzzOk) failures++;
+console.log(
+  `${fuzzOk ? "✅" : "❌"} ellipse fuzz (n=${N}): ${((ellipses / N) * 100).toFixed(1)}% ellipse, ` +
+    `${(misRate * 100).toFixed(1)}% misread as a polygon (want ≤5%)`,
+);
+
 console.log(failures === 0 ? "\nALL SHAPE CASES PASSED" : `\n${failures} CASE(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

@@ -1,7 +1,9 @@
 use std::fs::OpenOptions;
+use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{Manager, RunEvent, State};
 
 /// TCP port for the local MLX server. LUCIDA_AI_PORT overrides the default.
@@ -30,6 +32,13 @@ fn sidecar_dir() -> PathBuf {
         .into()
 }
 
+/// Whether something is already listening on the local server port — e.g. a
+/// server left behind by a `tauri dev` hot-reload, or one started by hand.
+fn port_in_use(port: u16) -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
+}
+
 /// Owns the local MLX model server child process and its config.
 struct AiSidecar {
     child: Mutex<Option<Child>>,
@@ -47,6 +56,12 @@ impl AiSidecar {
             if matches!(c.try_wait(), Ok(None)) {
                 return Ok(());
             }
+        }
+        // A server may already be serving on the port (a dev hot-reload can
+        // leave one behind, or the user started one by hand). Adopt it rather
+        // than spawning a duplicate that would just fail to bind.
+        if port_in_use(self.port) {
+            return Ok(());
         }
         let out = OpenOptions::new()
             .create(true)
@@ -76,14 +91,16 @@ impl AiSidecar {
         }
     }
 
-    /// Whether the server child is currently alive.
+    /// Whether a server is reachable — either our own child or one we adopted.
     fn running(&self) -> bool {
         if let Ok(mut g) = self.child.lock() {
             if let Some(c) = g.as_mut() {
-                return matches!(c.try_wait(), Ok(None));
+                if matches!(c.try_wait(), Ok(None)) {
+                    return true;
+                }
             }
         }
-        false
+        port_in_use(self.port)
     }
 }
 

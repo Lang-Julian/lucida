@@ -71,10 +71,17 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(
       autoBeautifyRef.current = autoBeautify;
     }, [autoBeautify]);
 
-    // Ids of the currently pending ghost elements, plus an in-flight guard so a
-    // second suggest() can't race the first.
-    const ghostIds = useRef<Set<string>>(new Set());
+    // In-flight guard so a second suggest() can't race the first. Pending ghost
+    // suggestions are marked on the elements themselves (customData.lucidaGhost)
+    // rather than a separate id set, so undo/redo can never desync the two.
     const inFlight = useRef(false);
+
+    // Mirror aiConfig into a ref so suggest() always uses the latest base URL /
+    // model — these resolve from ai_status after the sidecar reports its port.
+    const aiConfigRef = useRef(aiConfig);
+    useEffect(() => {
+      aiConfigRef.current = aiConfig;
+    }, [aiConfig]);
 
     /** Replace a just-drawn freehand stroke with a recognized clean primitive. */
     const handlePointerUp = (
@@ -176,12 +183,12 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(
           inFlight.current = true;
           onBusyChange?.(true);
           try {
-            // Exclude any still-pending ghosts so we summarize only real scene.
+            // Summarize only the real scene — exclude any still-pending ghosts.
             const real = api
               .getSceneElements()
-              .filter((e) => !ghostIds.current.has(e.id));
+              .filter((e) => !e.customData?.lucidaGhost);
             const summary = summarizeScene(real, intent);
-            const suggestions = await suggestNext(summary, aiConfig);
+            const suggestions = await suggestNext(summary, aiConfigRef.current);
             const skeletons = suggestionsToSkeletons(suggestions, summary);
             const created = convertToExcalidrawElements(skeletons, {
               regenerateIds: true,
@@ -190,11 +197,11 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(
               ...e,
               opacity: GHOST_OPACITY,
               strokeStyle: "dashed",
+              customData: { ...(e.customData ?? {}), lucidaGhost: true },
             }));
-            ghosts.forEach((g) => ghostIds.current.add(g.id));
             api.updateScene({
               elements: [...api.getSceneElements(), ...ghosts] as any,
-              captureUpdate: CaptureUpdateAction.NEVER,
+              captureUpdate: CaptureUpdateAction.IMMEDIATELY,
             });
             try {
               api.scrollToContent(ghosts as any, {
@@ -217,18 +224,20 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(
         acceptSuggestions(): void {
           const api = apiRef.current;
           if (!api) return;
-          const next = api
-            .getSceneElements()
-            .map((e) =>
-              ghostIds.current.has(e.id)
-                ? { ...e, opacity: 100, strokeStyle: "solid" }
-                : e,
-            );
+          const next = api.getSceneElements().map((e) =>
+            e.customData?.lucidaGhost
+              ? {
+                  ...e,
+                  opacity: 100,
+                  strokeStyle: "solid",
+                  customData: { ...e.customData, lucidaGhost: false },
+                }
+              : e,
+          );
           api.updateScene({
             elements: next as any,
             captureUpdate: CaptureUpdateAction.IMMEDIATELY,
           });
-          ghostIds.current.clear();
         },
 
         dismissSuggestions(): void {
@@ -236,16 +245,18 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(
           if (!api) return;
           const next = api
             .getSceneElements()
-            .filter((e) => !ghostIds.current.has(e.id));
+            .filter((e) => !e.customData?.lucidaGhost);
           api.updateScene({
             elements: next as any,
-            captureUpdate: CaptureUpdateAction.NEVER,
+            captureUpdate: CaptureUpdateAction.IMMEDIATELY,
           });
-          ghostIds.current.clear();
         },
 
         hasPendingSuggestions(): boolean {
-          return ghostIds.current.size > 0;
+          const api = apiRef.current;
+          return api
+            ? api.getSceneElements().some((e) => e.customData?.lucidaGhost)
+            : false;
         },
       }),
       [aiConfig, onBusyChange],

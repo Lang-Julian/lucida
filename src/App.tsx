@@ -10,7 +10,7 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import Whiteboard from "./components/Whiteboard";
 import AiPanel from "./components/AiPanel";
 import WelcomeHint from "./components/WelcomeHint";
-import { DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL, DEFAULT_AI_PORT } from "./lib/config";
+import { DEFAULT_AI_MODEL, DEFAULT_AI_PORT } from "./lib/config";
 import type { AiStatus, WhiteboardHandle } from "./lib/types";
 import "./App.css";
 
@@ -36,9 +36,12 @@ function App() {
   });
 
   const ref = useRef<WhiteboardHandle | null>(null);
+  // Resolve from the live sidecar status so LUCIDA_AI_PORT / LUCIDA_AI_MODEL
+  // overrides take effect end-to-end (the defaults seed it until the first
+  // ai_status poll reports the real port + model).
   const aiConfig = useMemo(
-    () => ({ baseUrl: DEFAULT_AI_BASE_URL, model: DEFAULT_AI_MODEL }),
-    [],
+    () => ({ baseUrl: `http://127.0.0.1:${status.port}`, model: status.model }),
+    [status.port, status.model],
   );
 
   // Spawn the sidecar once, then poll status + probe readiness on an interval.
@@ -46,13 +49,23 @@ function App() {
     invoke("ai_start").catch(() => {});
 
     let cancelled = false;
+    let polling = false; // guard against overlapping polls when a probe is slow
     const poll = async () => {
+      if (polling) return;
+      polling = true;
       try {
         const s = await invoke<RawAiStatus>("ai_status");
         let ready = false;
         if (s.running) {
           try {
-            const r = await tauriFetch(DEFAULT_AI_BASE_URL + "/v1/models");
+            // Probe the port the sidecar actually reports, with a timeout so a
+            // slow probe can't pile up behind the 2 s interval.
+            const ctrl = new AbortController();
+            const t = window.setTimeout(() => ctrl.abort(), 1500);
+            const r = await tauriFetch(`http://127.0.0.1:${s.port}/v1/models`, {
+              signal: ctrl.signal,
+            });
+            window.clearTimeout(t);
             ready = r.ok;
           } catch {
             ready = false;
@@ -61,6 +74,8 @@ function App() {
         if (!cancelled) setStatus({ ...s, ready });
       } catch {
         // Sidecar not reachable yet; leave the last known status untouched.
+      } finally {
+        polling = false;
       }
     };
 
@@ -73,11 +88,15 @@ function App() {
   }, []);
 
   const onSuggest = useCallback(async () => {
-    if (!ref.current) return;
+    if (!ref.current || busy) return;
+    if (!status.ready) {
+      setToast("Model still loading…");
+      return;
+    }
     const result = await ref.current.suggest(intent);
     setPending(ref.current.hasPendingSuggestions());
     if (result.error) setToast(result.error);
-  }, [intent]);
+  }, [intent, busy, status.ready]);
 
   const onAccept = useCallback(() => {
     ref.current?.acceptSuggestions();

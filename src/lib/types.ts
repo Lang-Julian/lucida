@@ -62,6 +62,8 @@ export interface EdgeInfo {
   from: string;
   /** target node id */
   to: string;
+  /** the arrow's bound label, if any (e.g. "approves", "yes") */
+  label?: string;
 }
 
 export interface SceneSummary {

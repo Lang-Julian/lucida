@@ -113,7 +113,9 @@ function rdp(points: Point[], eps: number): Point[] {
 
 /* ───────────────────────────  recognition  ─────────────────────────── */
 
-const TURN_CORNER = (35 * Math.PI) / 180; // a vertex turns more than ~35°
+// Real polygon corners turn ≥~72° (square 90°, triangle 120°); the vertices RDP
+// leaves on a smooth curve turn only ~45°, so the threshold sits between them.
+const TURN_CORNER = (55 * Math.PI) / 180;
 
 /**
  * Decide whether a freehand stroke was MEANT as a clean primitive.
@@ -204,10 +206,17 @@ export function recognizeStroke(points: Point[], opts?: RecognizerOptions): Reco
   // Circularity: 1.0 for a perfect circle, lower for spiky/elongated shapes.
   const C = (4 * Math.PI * A) / (L * L);
 
-  // Corner-based shapes take priority over raw circularity: a clean square has
-  // circularity π/4 ≈ 0.79 and a diamond the same, so an early ellipse gate
-  // would swallow both. Classify by corners first; ellipse is the round fallback.
+  // A very round outline is an ellipse regardless of stray corners: a clean
+  // square sits at C≈0.79 and a triangle at C≈0.6, so 0.85 cleanly separates
+  // true circles/ellipses (which RDP can otherwise leave with spurious corners).
+  if (C >= 0.85) {
+    const confidence = clamp(C, 0, 1);
+    return confidence >= minConfidence
+      ? make("ellipse", confidence, undefined)
+      : null;
+  }
 
+  // Below 0.85, corner structure decides (square/diamond ≈0.79, triangle ≈0.6).
   // TRIANGLE: roughly three corners. Confidence from how clean the 3-gon is.
   if (corners === 3 && verts.length >= 3) {
     const tri = pickCorners(verts, 3);

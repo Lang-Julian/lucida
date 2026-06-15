@@ -36,6 +36,16 @@ check("fenced form parses to 1", c.length === 1, `got ${c.length}`);
 check("garbage -> []", parseSuggestions("sorry, I cannot do that").length === 0);
 check("truncated json -> []", parseSuggestions('{"suggestions":[{"kind":').length === 0);
 
+// 4b. Arrow index remap: an invalid item before the nodes must not desync
+// "new:<i>" references (orig: invalid=0, Build=1, Deploy=2, arrow.to=new:2).
+const desync =
+  '[{"kind":"banana"},{"kind":"rectangle","text":"Build"},' +
+  '{"kind":"rectangle","text":"Deploy"},{"kind":"arrow","from":"a","to":"new:2"}]';
+const ds = parseSuggestions(desync);
+const dsArrow = ds.find((s) => s.kind === "arrow");
+check("remap: invalid dropped, 3 kept", ds.length === 3, `got ${ds.length}`);
+check('remap: arrow.to rewritten "new:2" -> "new:1" (Deploy)', dsArrow?.to === "new:1", `got ${dsArrow?.to}`);
+
 // 5. summarizeScene: a labeled rectangle + a standalone text + a bound arrow.
 const mockElements = [
   { id: "a", type: "rectangle", x: 0, y: 0, width: 160, height: 80 },

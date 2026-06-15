@@ -1,12 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" width="112" alt="Lucida logo" />
-</p>
-
-<h1 align="center">Lucida</h1>
-
-<p align="center">
-  A local-first smart whiteboard for the Mac — sketch, snap to clean shapes,<br/>
-  and let an on-device LLM carry the idea forward.
+  <img src="docs/hero.png" alt="Lucida — a local-first AI smart whiteboard for the Mac" width="840" />
 </p>
 
 <p align="center">

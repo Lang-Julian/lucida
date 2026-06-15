@@ -75,7 +75,12 @@ export function summarizeScene(
     if (el.type !== "arrow") continue;
     const from = el.startBinding?.elementId;
     const to = el.endBinding?.elementId;
-    if (from && to) edges.push({ from, to });
+    if (from && to) {
+      // Carry the arrow's bound label — edge labels often hold the diagram's
+      // actual semantics ("approves", the yes/no on a decision branch).
+      const label = labelByContainer.get(el.id);
+      edges.push(label ? { from, to, label } : { from, to });
+    }
   }
 
   return intent ? { nodes, edges, intent } : { nodes, edges };
@@ -195,13 +200,33 @@ export function parseSuggestions(raw: string): Suggestion[] {
     : (parsed as { suggestions?: unknown })?.suggestions;
   if (!Array.isArray(list)) return [];
 
-  const out: Suggestion[] = [];
-  for (const item of list) {
+  // Validate while remembering each item's ORIGINAL model index. The model's
+  // "new:<i>" arrow references point at positions in its own array, so when we
+  // drop invalid items or cap the list we must rewrite those references to the
+  // compacted output positions — otherwise arrows silently desync (go missing
+  // or bind to the wrong node).
+  const kept: Array<{ sug: Suggestion; orig: number }> = [];
+  list.forEach((item, orig) => {
     const sug = validateSuggestion(item);
-    if (sug) out.push(sug);
-    if (out.length === 3) break;
-  }
-  return out;
+    if (sug) kept.push({ sug, orig });
+  });
+  const capped = kept.slice(0, 3);
+
+  const remap = new Map<number, number>();
+  capped.forEach((k, i) => remap.set(k.orig, i));
+  const fixRef = (ref: string | undefined): string | undefined => {
+    if (!ref) return undefined;
+    const m = /^new:(\d+)$/.exec(ref);
+    if (!m) return ref; // an existing scene-node id — leave untouched
+    const mapped = remap.get(Number(m[1]));
+    return mapped === undefined ? undefined : `new:${mapped}`; // drop dangling refs
+  };
+
+  return capped.map(({ sug }) =>
+    sug.kind === "arrow"
+      ? { ...sug, from: fixRef(sug.from), to: fixRef(sug.to) }
+      : sug,
+  );
 }
 
 /** Coerce one raw model item into a Suggestion, or null if it is unusable. */
@@ -344,7 +369,8 @@ export function suggestionsToSkeletons(
     placed.set(index, { id, x, y, w, h, kind: sug.kind, text: sug.text });
 
     if (sug.kind === "text") {
-      nodeSkeletons.push({ type: "text", x, y, text: sug.text ?? "" });
+      // Carry the id so an arrow can bind to this text node by "new:<i>".
+      nodeSkeletons.push({ type: "text", id, x, y, text: sug.text ?? "" });
     } else {
       // sug.kind is narrowed to "rectangle" | "ellipse" | "diamond" here.
       nodeSkeletons.push({
