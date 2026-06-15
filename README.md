@@ -17,6 +17,14 @@ nothing leaves your machine.
 > Named after the *camera lucida*, the optical drawing aid artists used to trace
 > what they saw. Rename freely.
 
+## Demo
+
+<p align="center">
+  <img src="docs/demo.png" alt="Lucida workspace — a flow diagram with a dashed AI ghost suggestion and the freehand-to-clean beautify" width="860" />
+</p>
+
+<p align="center"><sub>The workspace: freehand strokes snap to clean shapes, and the local model proposes the next steps as dashed “ghost” elements you accept (<code>⌘↵</code>) or dismiss (<code>Esc</code>). <em>Illustration — a screen recording is on the way.</em></sub></p>
+
 ## Why local-first
 
 Lucida runs **entirely on your machine**. The model server binds to `127.0.0.1`
