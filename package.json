@@ -1,0 +1,52 @@
+{
+  "name": "lucida",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "An AI-enhanced smart whiteboard for macOS — sketch ideas, auto-beautify shapes, and get suggestions from a fully on-device LLM.",
+  "license": "MIT",
+  "author": "Julian Lang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lang-Julian/lucida.git"
+  },
+  "homepage": "https://github.com/Lang-Julian/lucida#readme",
+  "bugs": {
+    "url": "https://github.com/Lang-Julian/lucida/issues"
+  },
+  "keywords": [
+    "tauri",
+    "react",
+    "excalidraw",
+    "mlx",
+    "whiteboard",
+    "local-first",
+    "on-device-ai",
+    "diagramming",
+    "macos"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "tsx scratch/test-recognizer.ts && tsx scratch/test-ai.ts",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-http": "^2.5.9",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
