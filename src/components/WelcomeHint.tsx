@@ -1,4 +1,7 @@
+import { strings, type Lang } from "../lib/i18n";
+
 interface WelcomeHintProps {
+  lang: Lang;
   /** When false, the hint fades out and stops receiving any layout focus. */
   visible: boolean;
 }
@@ -18,22 +21,19 @@ function Key({ combo, label }: { combo: string; label: string }) {
  * pointer events (so the user can draw straight through it) and fades out once
  * the canvas has been touched.
  */
-function WelcomeHint({ visible }: WelcomeHintProps) {
+function WelcomeHint({ visible, lang }: WelcomeHintProps) {
+  const T = strings(lang);
   return (
     <div
       className={`welcome-hint${visible ? "" : " welcome-hint--hidden"}`}
       role="note"
       aria-hidden={!visible}
     >
-      <p className="welcome-hint__lead">
-        Draw a rough shape — it cleans up. Press{" "}
-        <kbd className="welcome-hint__kbd welcome-hint__kbd--inline">⌘↵</kbd> for
-        ideas.
-      </p>
+      <p className="welcome-hint__lead">{T.hint}</p>
       <div className="welcome-hint__legend">
-        <Key combo="⌘↵" label="suggest" />
-        <Key combo="Esc" label="dismiss" />
-        <Key combo="⌘B" label="beautify" />
+        <Key combo="⌘I" label={T.hintPicture} />
+        <Key combo="⌘Z" label={T.hintUndo} />
+        <Key combo="⌘," label={T.hintSettings} />
       </div>
     </div>
   );
