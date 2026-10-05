@@ -1,9 +1,9 @@
 {
   "name": "lucida",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "An AI-enhanced smart whiteboard for macOS — sketch ideas, auto-beautify shapes, and get suggestions from a fully on-device LLM.",
+  "description": "A whiteboard for macOS: write a word and get a picture, one board per folder, a plan wall synced with Markdown files, and an MCP server so agents can draw on it. Tauri + React + Excalidraw.",
   "license": "MIT",
   "author": "Julian Lang",
   "repository": {
@@ -29,12 +29,14 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "tsx scratch/test-recognizer.ts && tsx scratch/test-ai.ts",
-    "tauri": "tauri"
+    "test": "tsx scratch/test-recognizer.ts && tsx scratch/test-ai.ts && tsx scratch/test-project.ts && tsx scratch/test-masterplan.ts && tsx scratch/test-company-map.ts && tsx scratch/test-plan.ts && node scratch/test-mcp.mjs",
+    "tauri": "tauri",
+    "demo": "tsx scripts/demo.ts"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",

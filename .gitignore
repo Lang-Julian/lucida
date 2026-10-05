@@ -25,3 +25,6 @@ sidecar/.venv
 *.njsproj
 *.sln
 *.sw?
+
+# A board lives in its folder; never publish one
+.lucida/

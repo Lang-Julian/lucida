@@ -36,6 +36,12 @@
   --warn: #f59e0b;
   --off: #9ca3af;
   --danger-bg: rgba(220, 38, 38, 0.95);
+  --danger: #dc2626;
+
+  /* Illustrate placeholder — a hint of where the picture lands, never a block */
+  --pending-border: rgba(79, 70, 229, 0.4);
+  --pending-bg: rgba(79, 70, 229, 0.05);
+  --pending-sweep: rgba(124, 58, 237, 0.13);
 
   /* Controls */
   --track-off: rgba(15, 23, 42, 0.16);
@@ -166,15 +172,26 @@ body {
   font-weight: 450;
 }
 
-/* ───────────────────────────  Floating AI panel  ─────────────────────────── */
-
-.ai-panel {
+/* Live stroke prediction — the shape the model expects, under your hand */
+.lucida-shadow {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 5;
-  width: 268px;
-  padding: 14px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  color: var(--accent);
+  transition: opacity 120ms linear;
+}
+
+/* Click a picture: say what should be different about it */
+.lucida-edit {
+  position: absolute;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
   border-radius: var(--radius);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -183,65 +200,161 @@ body {
   box-shadow:
     var(--panel-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  color: var(--fg);
   font:
-    13px/1.45 system-ui,
+    13px/1.4 system-ui,
     -apple-system,
     sans-serif;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  animation: lucida-pending-in 200ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
 }
 
-.ai-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.lucida-edit__input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+  transition:
+    border-color var(--t),
+    box-shadow var(--t);
 }
 
-.ai-panel__title {
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: 0.2px;
+.lucida-edit__input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-/* Status pill */
-.ai-panel__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 9px 3px 8px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 550;
-  color: var(--muted);
-  background: var(--kbd-bg);
-  border: 1px solid var(--hairline);
-  white-space: nowrap;
-}
-
-.ai-panel__status--ready {
-  color: var(--ok);
-  background: var(--ok-soft);
-  border-color: var(--ok-border);
-}
-
-.ai-panel__dot {
+.lucida-edit__go {
   flex: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--t),
+    opacity var(--t);
+}
+
+.lucida-edit__go:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.lucida-edit__go:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Illustrate — the place a picture is being drawn for */
+.lucida-pending-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/*
+ * The animation only. The frame itself is a real scene element underneath, so
+ * this layer must never take the pointer — dragging and resizing belong to
+ * Excalidraw.
+ */
+.lucida-pending {
+  position: absolute;
+  border-radius: 16px;
+  border: 2px dashed var(--pending-border);
+  background: var(--pending-bg);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  transform-origin: center top;
+  /* Appear, then keep breathing — the frame is alive while the model draws. */
+  animation:
+    lucida-pending-in 260ms cubic-bezier(0.34, 1.3, 0.64, 1) both,
+    lucida-breathe 1.9s ease-in-out 260ms infinite;
+}
+
+/* A light sweeping across the frame — the "something is happening" signal. */
+.lucida-pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    var(--pending-sweep) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: lucida-sweep 1.5s linear infinite;
+}
+
+.lucida-pending__dots {
+  display: flex;
+  gap: 7px;
+  z-index: 1;
+}
+
+.lucida-pending__dots i {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--off);
+  background: var(--accent);
+  animation: lucida-bounce 1.1s ease-in-out infinite;
 }
 
-.ai-panel__dot--loading {
-  background: var(--warn);
-  animation: ai-pulse 1.4s ease-in-out infinite;
+.lucida-pending__dots i:nth-child(2) {
+  animation-delay: 0.15s;
 }
 
-.ai-panel__dot--ready {
-  background: var(--ok);
+.lucida-pending__dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes lucida-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes lucida-pending-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lucida-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes lucida-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-7px) scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes ai-pulse {
@@ -256,203 +369,6 @@ body {
   }
 }
 
-.ai-panel__model {
-  margin: -4px 0 0;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Auto-beautify switch */
-.ai-panel__switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.ai-panel__switch input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.ai-panel__switch-track {
-  flex: none;
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--track-off);
-  transition: background var(--t);
-}
-
-.ai-panel__switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
-  transition: transform var(--t);
-}
-
-.ai-panel__switch input:checked + .ai-panel__switch-track {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-}
-
-.ai-panel__switch input:checked + .ai-panel__switch-track .ai-panel__switch-thumb {
-  transform: translateX(16px);
-}
-
-.ai-panel__switch input:focus-visible + .ai-panel__switch-track {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.ai-panel__switch-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-  font-weight: 550;
-}
-
-.ai-panel__hint {
-  font-weight: 400;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-/* Intent input */
-.ai-panel__intent {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--field-border);
-  background: var(--field-bg);
-  color: var(--fg);
-  font: inherit;
-  outline: none;
-  transition:
-    border-color var(--t),
-    box-shadow var(--t);
-}
-
-.ai-panel__intent::placeholder {
-  color: var(--faint);
-}
-
-.ai-panel__intent:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-ring);
-}
-
-/* Buttons */
-.ai-panel__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background var(--t),
-    border-color var(--t),
-    box-shadow var(--t),
-    opacity var(--t),
-    transform var(--t);
-}
-
-.ai-panel__btn:active:not(:disabled) {
-  transform: translateY(0.5px);
-}
-
-.ai-panel__btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--accent-ring);
-}
-
-.ai-panel__btn--primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: var(--accent-fg);
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
-}
-
-.ai-panel__btn--primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-strong), var(--accent-2));
-  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.38);
-}
-
-.ai-panel__btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.ai-panel__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.ai-panel__actions .ai-panel__btn {
-  flex: 1;
-}
-
-.ai-panel__btn--accept {
-  background: var(--ok-soft);
-  border-color: var(--ok-border);
-  color: var(--ok);
-}
-
-.ai-panel__btn--accept:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.22);
-}
-
-.ai-panel__btn--dismiss {
-  background: transparent;
-  border-color: var(--field-border);
-  color: var(--muted);
-}
-
-.ai-panel__btn--dismiss:hover:not(:disabled) {
-  background: var(--kbd-bg);
-}
-
-/* Inline keycap inside buttons */
-.ai-panel__kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: inherit;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: currentColor;
-}
-
-.ai-panel__btn--accept .ai-panel__kbd,
-.ai-panel__btn--dismiss .ai-panel__kbd {
-  background: var(--kbd-bg);
-  border-color: var(--kbd-border);
-}
-
 /* ───────────────────────────  Error toast  ─────────────────────────── */
 
 .app__toast {
@@ -464,7 +380,8 @@ body {
   transform: translateX(-50%);
   padding: 10px 16px;
   border-radius: 10px;
-  background: var(--danger-bg);
+  /* a note, not an alarm: most toasts say something worked */
+  background: rgba(17, 24, 39, 0.92);
   color: #fff;
   font-size: 13px;
   font-weight: 500;
@@ -486,8 +403,13 @@ body {
 
 /* ───────────────────────────  Dark mode  ─────────────────────────── */
 
+/*
+ * Dark appearance. Applied when the system asks for it and nothing is pinned,
+ * and whenever the user pins it — the App writes `data-theme` on <html>, and
+ * the canvas is handed the same resolved value so the two never disagree.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #14161c;
     --fg: #e7e9f0;
     --muted: #a3a9b8;
@@ -515,13 +437,75 @@ body {
     --kbd-bg: rgba(255, 255, 255, 0.08);
     --kbd-border: rgba(255, 255, 255, 0.14);
     --danger-bg: rgba(239, 68, 68, 0.92);
+    --danger: #f87171;
+
+    --pending-border: rgba(167, 139, 250, 0.45);
+    --pending-bg: rgba(167, 139, 250, 0.07);
+    --pending-sweep: rgba(196, 181, 253, 0.16);
   }
 
-  .ai-panel {
-    box-shadow:
-      var(--panel-shadow),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  }
+}
+
+:root[data-theme="dark"] {
+    --bg: #14161c;
+    --fg: #e7e9f0;
+    --muted: #a3a9b8;
+    --faint: #7e8494;
+
+    --panel-bg: rgba(26, 29, 38, 0.66);
+    --panel-border: rgba(255, 255, 255, 0.1);
+    --panel-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    --hairline: rgba(255, 255, 255, 0.08);
+
+    --field-bg: rgba(255, 255, 255, 0.06);
+    --field-border: rgba(255, 255, 255, 0.14);
+
+    --accent: #6366f1;
+    --accent-2: #8b5cf6;
+    --accent-strong: #4f46e5;
+    --accent-ring: rgba(99, 102, 241, 0.3);
+
+    --ok: #4ade80;
+    --ok-soft: rgba(34, 197, 94, 0.16);
+    --ok-border: rgba(74, 222, 128, 0.38);
+    --off: #6b7280;
+
+    --track-off: rgba(255, 255, 255, 0.18);
+    --kbd-bg: rgba(255, 255, 255, 0.08);
+    --kbd-border: rgba(255, 255, 255, 0.14);
+    --danger-bg: rgba(239, 68, 68, 0.92);
+    --danger: #f87171;
+
+    --pending-border: rgba(167, 139, 250, 0.45);
+    --pending-bg: rgba(167, 139, 250, 0.07);
+    --pending-sweep: rgba(196, 181, 253, 0.16);
+}
+
+/*
+ * The canvas is Lucida's surface. Its controls get the same glass the panel
+ * has, so the app reads as one thing, and everything that points somewhere
+ * else is removed rather than restyled.
+ */
+.excalidraw .Island,
+.excalidraw .App-toolbar,
+.excalidraw .App-menu__left,
+.excalidraw .dropdown-menu .dropdown-menu-container {
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: var(--panel-bg) !important;
+  border: 1px solid var(--panel-border);
+  box-shadow:
+    var(--panel-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius);
+}
+
+.excalidraw .help-icon,
+.excalidraw .layer-ui__wrapper__top-right,
+.excalidraw a[href*="excalidraw.com"],
+.excalidraw .dropdown-menu-item--social,
+.excalidraw .welcome-screen-decor {
+  display: none !important;
 }
 
 /* ───────────────────────────  Reduced motion  ─────────────────────────── */
@@ -534,4 +518,682 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/*
+ * An agent's proposal at full strength, framed so it still reads as a
+ * proposal. Pointer-transparent: the poster underneath is a real scene and
+ * moving it belongs to Excalidraw.
+ */
+.lucida-agent-frame {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  border: 2px dashed var(--accent);
+  border-radius: 20px;
+  box-shadow: 0 0 0 6px var(--accent-ring);
+  animation: lucida-pending-in 260ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+
+.lucida-agent-frame__tag {
+  position: absolute;
+  left: 12px;
+  top: -44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 5px 6px 5px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  /* the frame lets the pointer through; its buttons must not */
+  pointer-events: auto;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+}
+
+.lucida-agent-frame__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lucida-agent-frame__btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lucida-agent-frame__btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.lucida-agent-frame__btn--go {
+  background: var(--accent-fg);
+  color: var(--accent);
+}
+
+.lucida-agent-frame__btn--go:hover {
+  background: var(--accent-fg);
+  opacity: 0.9;
+}
+
+.lucida-agent-frame__btn kbd {
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/*
+ * The plan inspector: the rest of a card's file, edited in place. Fixed to
+ * the left edge, clear of the AI panel on the right.
+ */
+.plan-inspector {
+  position: absolute;
+  left: 16px;
+  top: 72px;
+  z-index: 6;
+  width: 340px;
+  max-height: calc(100% - 96px);
+  overflow: auto;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: var(--fg);
+  box-shadow: var(--panel-shadow);
+  font-size: 13px;
+  animation: lucida-pending-in 200ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+
+.plan-inspector__kind {
+  margin: 0 0 6px;
+  color: #007ab5;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.plan-inspector__title {
+  width: 100%;
+  resize: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: 600 17px/1.3 inherit;
+  font-family: inherit;
+  outline: none;
+}
+
+.plan-inspector__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.plan-inspector__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--kbd-border);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.plan-inspector__chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot);
+}
+
+.plan-inspector__chip[aria-checked="true"] {
+  border-color: var(--dot);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot) 22%, transparent);
+  font-weight: 600;
+}
+
+.plan-inspector__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.plan-inspector__field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.plan-inspector__field > span,
+.plan-inspector__waits > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.plan-inspector__field select,
+.plan-inspector__field input,
+.plan-inspector__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--field-border);
+  border-radius: 9px;
+  background: var(--field-bg);
+  color: inherit;
+  font: inherit;
+}
+
+.plan-inspector__field--body textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.plan-inspector__waits ul {
+  margin: 4px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-inspector__waits li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--kbd-border);
+  color: #b45309;
+}
+
+.plan-inspector__waits.is-risk li {
+  color: #dc2626;
+}
+
+.plan-inspector__waits li.is-done {
+  color: #16a34a;
+  text-decoration: line-through;
+}
+
+.plan-inspector__waits button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.plan-inspector__source,
+.plan-inspector__file {
+  margin: 4px 0;
+  color: #6b7280;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.plan-inspector__actions {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.plan-inspector__actions button {
+  padding: 6px 10px;
+  border: 1px solid var(--kbd-border);
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.plan-inspector__archive {
+  margin-left: auto;
+  color: #dc2626 !important;
+}
+
+.lucida-edit__reroll {
+  flex: none;
+  width: 32px;
+  height: 31px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color var(--t), transform 300ms ease;
+}
+
+.lucida-edit__reroll:hover {
+  border-color: var(--accent);
+  transform: rotate(90deg);
+}
+
+/*
+ * The picture chip: one button under a selected word or sketch. It takes the
+ * pointer (the canvas must not read the press as a deselect), nothing else does.
+ */
+.lucida-chip {
+  position: absolute;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 11px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: 600 12.5px/1 system-ui, -apple-system, sans-serif;
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.28);
+  cursor: pointer;
+  animation: lucida-pending-in 180ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+
+.lucida-chip:hover {
+  background: var(--accent-strong);
+}
+
+.lucida-chip kbd {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.lucida-chip--key {
+  background: var(--panel-bg);
+  color: var(--fg);
+  border-color: var(--panel-border);
+  box-shadow: var(--panel-shadow);
+}
+
+/* Only while something runs: a picture being drawn, a prediction, the mic. */
+.app__status {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: var(--muted);
+  font: 500 12px/1 system-ui, -apple-system, sans-serif;
+  box-shadow: var(--panel-shadow);
+}
+
+.app__status-listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.app__status-listen i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: lucida-breathe 1.6s ease-in-out infinite;
+}
+
+/* Settings — a sheet over the canvas, opened with ⌘, */
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.28);
+  animation: toast-in 160ms ease-out;
+}
+
+.settings {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.35);
+  font: 13px/1.45 system-ui, -apple-system, sans-serif;
+}
+
+.settings__head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 10px;
+  background: var(--bg);
+}
+
+.settings__head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.settings__close {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.settings__close:hover {
+  background: var(--kbd-bg);
+}
+
+.settings__section {
+  padding: 10px 22px 14px;
+  border-top: 1px solid var(--hairline);
+}
+
+.settings__section h3 {
+  margin: 6px 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.settings__field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.settings__label {
+  font-weight: 600;
+}
+
+.settings__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings__field input,
+.settings__field select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+
+.settings__field input:focus,
+.settings__field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.settings__key,
+.settings__path {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--kbd-bg);
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings__btn {
+  flex: none;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.settings__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings__btn--go {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.settings__btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+}
+
+.settings__note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings__note--ok {
+  color: #16a34a;
+}
+
+.settings__note--bad {
+  color: var(--danger);
+}
+
+.settings__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings__chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings__chip[aria-checked="true"] {
+  border-color: var(--accent);
+  background: var(--accent-ring);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.settings__toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+  cursor: pointer;
+}
+
+.settings__toggle:last-of-type {
+  border-bottom: 0;
+}
+
+.settings__toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.settings__toggle em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.settings__toggle input {
+  flex: none;
+  appearance: none;
+  width: 36px;
+  height: 21px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--track-off, rgba(15, 23, 42, 0.18));
+  position: relative;
+  cursor: pointer;
+  transition: background var(--t);
+}
+
+.settings__toggle input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--t);
+}
+
+.settings__toggle input:checked {
+  background: var(--accent);
+}
+
+.settings__toggle input:checked::after {
+  transform: translateX(15px);
+}
+
+.settings__foot {
+  padding: 12px 22px 18px;
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings fieldset {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings__field.is-locked,
+.settings__toggle.is-locked {
+  opacity: 0.6;
+}
+
+.settings__lock {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--kbd-bg);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.settings__managed {
+  margin: 0 22px 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--accent-ring);
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.settings__sublabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings__swatch {
+  flex: none !important;
+  width: 44px;
+  height: 34px;
+  padding: 2px !important;
+  cursor: pointer;
+}
+
+.settings__logo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  background: #ffffff;
+  border: 1px solid var(--field-border);
+}
+
+.settings__logo--dark {
+  background: #0b1220;
+}
+
+.settings__logo img {
+  max-height: 30px;
+  max-width: 100%;
+}
+
+.settings__logo em {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings__foot {
+  display: grid;
+  gap: 4px;
+}
+
+.settings__foot code {
+  font-size: 11px;
 }

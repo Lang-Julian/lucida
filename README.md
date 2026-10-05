@@ -1,179 +1,303 @@
 <p align="center">
-  <img src="docs/hero.png" alt="Lucida — a local-first AI smart whiteboard for the Mac" width="840" />
+  <img src="docs/hero.png" alt="Lucida — a whiteboard for the Mac" width="840" />
 </p>
 
 <p align="center">
   <a href="https://github.com/Lang-Julian/lucida/actions/workflows/ci.yml"><img src="https://github.com/Lang-Julian/lucida/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/Lang-Julian/lucida/releases/latest"><img src="https://img.shields.io/github/v/release/Lang-Julian/lucida" alt="Latest release" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/built%20with-Tauri-24C8DB.svg?logo=tauri&logoColor=white" alt="Built with Tauri" /></a>
-  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=white" alt="React 19" /></a>
-  <a href="https://github.com/ml-explore/mlx"><img src="https://img.shields.io/badge/AI-MLX-FF6F61.svg" alt="MLX" /></a>
 </p>
 
-Sketch rough ideas and let Lucida clean them up and carry them forward. Fully
-**local-first**: the AI runs on-device via [MLX](https://github.com/ml-explore/mlx),
-nothing leaves your machine.
+**Lucida** is a whiteboard for the Mac, built on
+[Excalidraw](https://github.com/excalidraw/excalidraw):
+
+- **Write a word, get a picture.** Select it, press **✦ Picture** (or `⌘I`). Click
+  the picture to change it, or ↻ to draw it again.
+- **One board per folder — as many boards as you have folders.** The board
+  lives next to the project, in `<folder>/.lucida/`.
+- **A plan wall that is a folder of Markdown files.** Drag a card, pin a person
+  to it, pull a red string between two cards — and the files change with it.
+  Edit a file, and the wall changes.
+- **Agents can draw on it.** An MCP server lets Claude Code (or any MCP client)
+  read the board and put proposals on it.
 
 > Named after the *camera lucida*, the optical drawing aid artists used to trace
-> what they saw. Rename freely.
-
-## Demo
+> what they saw.
 
 <p align="center">
-  <img src="docs/demo.png" alt="Lucida workspace — a flow diagram with a dashed AI ghost suggestion and the freehand-to-clean beautify" width="860" />
+  <img src="docs/plan-wall.jpg" alt="The plan wall: a cork board with the goal in a dossier, the crew as polaroids, pinned index cards per front and horizon, sticky notes for open decisions and red string between dependent cards" width="860" />
 </p>
+<p align="center"><sub>The plan wall, drawn from the fictional demo plan (<code>npm run demo</code>). Every card is a Markdown file.</sub></p>
 
-<p align="center"><sub>The workspace: freehand strokes snap to clean shapes, and the local model proposes the next steps as dashed “ghost” elements you accept (<code>⌘↵</code>) or dismiss (<code>Esc</code>). <em>Illustration — a screen recording is on the way.</em></sub></p>
+## Install
 
-## Why local-first
+Download **Lucida.app** from the [latest release](https://github.com/Lang-Julian/lucida/releases/latest),
+unzip it and move it to `/Applications`. The app is not notarized yet, so the
+first start needs a right-click → **Open** (or
+`xattr -dr com.apple.quarantine /Applications/Lucida.app`).
 
-Lucida runs **entirely on your machine**. The model server binds to `127.0.0.1`
-only, there is **no telemetry**, no accounts, and no network calls to anyone
-else's infrastructure — your diagrams never leave the device. Beautify is pure
-geometry and needs no model at all; Suggest uses a local MLX model so even the
-AI features work fully offline. Privacy is the default, not a setting.
+macOS on Apple Silicon. Pictures need an [OpenRouter](https://openrouter.ai)
+key — paste it in the settings (`⌘,`). Everything else works without one.
 
-## What it does
+Open a folder from the menu (**Open folder …**), or from a terminal:
 
-- **Beautify** — draw a wobbly rectangle, ellipse, diamond, triangle or line
-  freehand; on pen-up it snaps to a clean shape (with `⌘Z` to undo if it
-  guessed wrong). Pure geometry, no model needed — works offline instantly.
-- **Suggest next** — a local LLM looks at the diagram you've drawn and proposes
-  the next 1–3 elements (boxes, arrows, labels) to express the idea. They appear
-  as dashed **ghost** elements you **Accept** (`⌘↵`) or **Dismiss** (`Esc`).
-
-## How it works
-
-Two features, two very different mechanisms:
-
-- **Beautify is pure geometry.** A freehand stroke is analysed by the recognizer
-  (`src/lib/recognizer.ts`): corner count, aspect ratio, closure and straightness
-  decide whether it becomes a rectangle, ellipse, diamond, triangle or line. No
-  model, no network — it runs the instant you lift the pen.
-- **Suggest is a local LLM.** The current scene is summarized and sent to a local
-  MLX model over an OpenAI-compatible HTTP endpoint. The model returns **JSON**
-  describing the next elements; `src/lib/ai.ts` parses it into Excalidraw
-  skeletons, which the canvas renders as dashed ghost elements you accept or
-  dismiss.
-
-### Architecture
-
-```mermaid
-flowchart LR
-  subgraph App[".app bundle (Tauri)"]
-    UI["React UI<br/>(Excalidraw canvas)"]
-    Rust["Rust sidecar manager<br/>(src-tauri/src/lib.rs)"]
-    Server["mlx_lm.server<br/>127.0.0.1:8765"]
-  end
-
-  UI -- "Tauri IPC<br/>ai_start / ai_stop / ai_status" --> Rust
-  Rust -- "spawn / kill child process" --> Server
-  UI -- "HTTP via plugin-http<br/>POST /v1/chat/completions" --> Server
+```bash
+scripts/lucida ~/code/some-repo        # the board for that project
 ```
 
-The Rust layer spawns/kills the model server as a managed child process; the
-React frontend then talks to that same server directly over
-`http://127.0.0.1:8765` using `@tauri-apps/plugin-http` (CORS-free calls to
-`127.0.0.1`).
+## Pictures
 
-## Stack
+1. Write a word on the board — or sketch something.
+2. Select it. A **✦ Picture** chip appears under it; click it (or press `⌘I`).
+3. The picture lands under the word, on a transparent background.
+4. **Click the picture** to change it: type what should be different ("make it
+   night"), Enter. The model gets the picture itself, so it edits rather than
+   starting over. **↻** draws the same subject fresh. `⌘Z` brings back the old one.
 
-| Layer | Choice |
+Nothing is guessed: with nothing selected, nothing is drawn. The image model
+(default `openai/gpt-image-2.5-flare`) and the style are picked in the settings;
+the model list is read live from OpenRouter.
+
+## The plan wall
+
+A plan is a folder of small Markdown files, `wiki/plan/*.md` — one per goal,
+horizon, front, card, decision, risk, process and process step. The structure
+lives in the frontmatter, the "why" in the body:
+
+```markdown
+---
+title: Opening night GO on the final menu
+kind: card            # goal · horizon · front · card · decision · risk · process · step
+front: product        # the row
+horizon: h1-launch    # the column
+status: doing         # todo · doing · done · blocked · archived
+owner: mara-klein     # a person page in wiki/entities/
+depends_on: [product-espresso]
+---
+
+Why this card exists, in as many words as it needs.
+```
+
+Open the folder in Lucida and choose **Masterplan (live)** in the menu. The
+wall shows the goal with a live countdown, the crew, every card under its front
+and horizon, open decisions as sticky notes, risks stamped in red, and the
+processes as rows of cards on one string.
+
+| On the wall | In the file |
 |---|---|
-| Shell | **Tauri v2** (Rust) → a real, lightweight `.app` |
-| UI | **React 19 + Vite 7 + TypeScript** |
-| Canvas | **Excalidraw 0.18** (MIT, hand-drawn aesthetic) |
-| AI | **MLX** running `mlx-community/Qwen2.5-3B-Instruct-4bit` locally, via `mlx_lm.server` (OpenAI-compatible) |
-| Transport | `@tauri-apps/plugin-http` (CORS-free calls to `127.0.0.1`) |
+| drag a card to another cell | `front`, `horizon` |
+| drop a polaroid on a card | `owner` |
+| draw an arrow from card to card | `depends_on` of the target (from a risk: `affects`) |
+| delete a string | the dependency is dropped |
+| type a new title | `title` |
+| write a word into an empty cell | a new card file |
+| delete a card | `status: archived` — the file is never deleted |
+| drag a process step along its row | `order` |
+| click a card | a panel edits status, owner, due date and the body |
 
-The Rust layer spawns/kills the model server as a managed child process; the
-frontend talks to it over `http://127.0.0.1:8765`.
+Every write is atomic and touches only the keys it changed. Editing a file in
+any editor (Obsidian, VS Code, an agent) redraws the wall within about two
+seconds; nothing is redrawn under a drag in progress.
 
-## Prerequisites
-
-- macOS on Apple Silicon (MLX requirement)
-- Node 20+, Rust (via `rustup`), Xcode Command Line Tools
-- [`uv`](https://github.com/astral-sh/uv) for the Python sidecar
-
-## Setup
-
-```bash
-# 1. Frontend deps
-npm install
-
-# 2. Python sidecar (MLX) — creates sidecar/.venv and installs mlx-lm
-uv venv --python 3.12 sidecar/.venv
-uv pip install --python sidecar/.venv/bin/python mlx-lm
-
-# 3. (Optional) pre-fetch the model so first launch is instant
-sidecar/.venv/bin/python -m mlx_lm.generate \
-  --model mlx-community/Qwen2.5-3B-Instruct-4bit --prompt hi --max-tokens 1
-```
-
-## Run
+Try it with a fictional café opening:
 
 ```bash
-npm run tauri dev      # dev: hot-reload + auto-spawns the model server
-npm run tauri build    # ship a .app bundle
+npm run demo -- ~/lucida-demo     # then open ~/lucida-demo in Lucida → Masterplan (live)
 ```
 
-Beautify works the moment the window opens. "Suggest next" lights up once the
-model has loaded (the panel shows a grey → amber → green status dot).
+The goal file's `brand:` names whose plan it is; without one it is the
+organisation's from the settings, and only then does its logo hang on the wall.
+A plain grid instead of the cork wall: `plan_board(look: "clean")`.
 
-## Configuration
+**Company map.** In the same kind of folder, `wiki/entities/*.md` (people,
+companies, products — with `category:` and `tags:` in the frontmatter) becomes
+**Company Map (live)**: one poster of everyone and everything, grouped by tags,
+redrawn whenever a page changes. Only the frontmatter and `wiki/index.md` are
+read; pages marked `access: leadership` stay off the map unless asked for.
 
-Override at launch with environment variables:
+## Agents on the board (MCP)
 
-| Var | Default | Meaning |
-|---|---|---|
-| `LUCIDA_AI_MODEL` | `mlx-community/Qwen2.5-3B-Instruct-4bit` | any MLX model id (e.g. `…Qwen2.5-7B-Instruct-4bit` for higher quality) |
-| `LUCIDA_AI_PORT` | `8765` | model server port |
-| `LUCIDA_AI_DIR` | `~/Developer/lucida/sidecar` | dir holding `serve.sh` + `.venv` |
-
-> If you change the port, update the scope in
-> `src-tauri/capabilities/default.json` and `DEFAULT_AI_PORT` in `src/lib/config.ts`.
-
-## Project layout
-
-```
-src/
-  lib/
-    types.ts        # shared contracts (the single source of truth)
-    config.ts       # port / model / ghost-opacity defaults
-    recognizer.ts   # freehand stroke → clean primitive (pure geometry)
-    ai.ts           # scene → local LLM → suggestions → Excalidraw skeletons
-  components/
-    Whiteboard.tsx  # Excalidraw wrapper: beautify + ghost-suggestion lifecycle
-    AiPanel.tsx     # floating status/controls panel
-  App.tsx           # shell, status polling, keyboard shortcuts
-src-tauri/
-  src/lib.rs        # spawns/kills the MLX sidecar; ai_start/ai_stop/ai_status
-sidecar/
-  serve.sh          # launches mlx_lm.server with the configured model + port
-scratch/            # standalone sanity tests (not part of the build)
-```
-
-## Tests
+Lucida serves a small board API on `127.0.0.1:8767`; `mcp/server.mjs` — one
+file, no dependencies — exposes it to any MCP client:
 
 ```bash
-npx tsx scratch/test-recognizer.ts   # synthetic strokes → expected shapes
-npx tsx scratch/test-ai.ts           # model-output parsing + skeleton building
+claude mcp add --scope user lucida -- node /path/to/lucida/mcp/server.mjs
 ```
+
+| Tool | Does |
+|---|---|
+| `get_board` | what is on the board — nodes, arrows, pictures, folder, visible area |
+| `add_nodes` / `add_image` | nodes and arrows (placed by the flow-aware layout), or one picture |
+| `render_masterplan` | a plan → one finished infographic poster with a picture per phase |
+| `plan_board` / `company_map` | the live plan wall / company map described above |
+| `export_png` | the proposal, the board, the map or the plan as a 2× PNG, with a preview for the agent |
+| `set_intent` / `open_folder` / `discard_proposal` | steer, switch folder, take a proposal back |
+
+Without a `root`, `plan_board` and `company_map` use the folder open in Lucida
+(or `LUCIDA_WIKI`, if set).
+
+**An agent proposes; it never changes the board.** What it adds arrives as a
+proposal inside a frame — **Keep** (`⌘↵`) keeps it, **Discard** (`Esc`)
+drops it, and nothing is saved until it is kept. If Lucida is not running, the
+MCP server starts it.
+
+The API is locked twice: a bearer token in
+`~/Library/Application Support/Lucida/board-api.json` (mode 0600, new on every
+launch), and any request carrying an `Origin` header — i.e. from a web page —
+is refused. The MCP server holds no key and no board state.
+
+## Settings
+
+`⌘,` (or the menu) opens the settings. Nothing about an organisation is built
+in — until it is set, every board is neutral.
+
+| Section | What |
+|---|---|
+| General | language (System / Deutsch / English), appearance, folder, smoothing of freehand shapes |
+| Organisation | name, accent colour, logo for light and for dark surfaces — used on posters, the company map, the plan wall and the **house** picture style |
+| Pictures | OpenRouter key and where it is kept, image model (listed live from OpenRouter), picture style |
+| Privacy | Zero Data Retention providers only (on by default) |
+| Experiments | suggestions, shape prediction, listening, their models and the folder for local models |
+
+Settings live in `~/Library/Application Support/Lucida/settings.json` — not
+in the webview, so they can be backed up and inspected.
+
+### For IT: managed defaults
+
+Put a `defaults.json` at `/Library/Application Support/Lucida/defaults.json`
+(for example via MDM) to set defaults for every user and lock what must not
+change:
+
+```json
+{
+  "defaults": {
+    "orgName": "Example Ltd",
+    "orgAccent": "#c2410c",
+    "language": "de",
+    "zdr": true,
+    "keyStore": "keychain",
+    "imageModel": "openai/gpt-image-2.5-flare"
+  },
+  "locked": ["zdr", "keyStore", "orgName", "orgAccent"]
+}
+```
+
+Defaults fill whatever a user has not chosen; locked keys are shown greyed out
+and cannot be changed in the app. `LUCIDA_MANAGED_SETTINGS` points at another
+file. Logos can be set as `orgLogo` / `orgLogoDark` data URLs
+(`data:image/svg+xml;base64,…`).
+
+## Privacy
+
+- **Nothing leaves the Mac without a key.** Drawing, shapes, boards, the plan
+  wall and the company map are all local.
+- **With a key**, only what a picture needs goes to OpenRouter: the word or
+  sketch, the board's intent, and — when you change a picture — the picture. Every call asks for **Zero Data Retention**
+  providers (`provider: {zdr: true, data_collection: "deny"}`); a model without
+  a ZDR endpoint falls back to `data_collection: "deny"`, never further. With
+  the ZDR setting off, only `data_collection: "deny"` is required. No app
+  attribution headers are sent.
+- **The key lives in the macOS Keychain** (service `Lucida`) by default, or in
+  a key file of your choice (one `OPENROUTER_API_KEY=…` line, mode 0600) — never
+  in the app's storage.
+- The board API listens on `127.0.0.1` only, with a per-launch token, and
+  refuses requests from web pages.
+- No telemetry, no accounts.
+
+## Experiments
+
+Off by default — off means not running, not loading, not costing anything.
+Switch them on in the settings:
+
+- **Suggestions** — `⌘↵` proposes the next elements of a diagram as dashed
+  ghosts; with a key also after every stroke. Without a key a local MLX model
+  (`mlx-community/Qwen2.5-3B-Instruct-4bit`, about 2 GB of RAM) answers.
+- **Predict shapes** — a faint shadow shows what a stroke is becoming while
+  you draw (needs the key).
+- **Listen** — `⌘L` transcribes speech on the Mac (Whisper via MLX) as context
+  for suggestions.
+
+Freehand shapes snap to clean ones by default (**Smooth shapes**); pure
+geometry, no model. The local models need a folder with `serve.sh`,
+`listen.sh` and a Python `.venv` (see below); set it in the settings.
 
 ## Keyboard
 
 | Key | Action |
 |---|---|
-| `⌘↵` | Suggest next (or Accept pending suggestions) |
-| `Esc` | Dismiss pending suggestions |
-| `⌘B` | Toggle auto-beautify |
-| `⌘Z` | Undo (beautify and accept are undoable) |
+| `⌘I` | picture of the selection |
+| `⌘,` | settings |
+| `⌘↵` | keep a proposal (or, with Suggestions on, ask for one) |
+| `Esc` | drop a proposal |
+| `⌘Z` | undo — also brings back a picture before it was changed |
+| `⌘L` | listen (experiment) |
 
-## Roadmap
+## Build from source
 
-- **Prompt-to-canvas** — type a sentence and have the model draft a whole diagram.
-- **Handwriting tidy** — recognize and straighten handwritten text, not just shapes.
-- **In-app model picker** — switch MLX models from the UI without restarting.
+Needs macOS on Apple Silicon, Node 20+, Rust (`rustup`), Xcode Command Line
+Tools. The experiments additionally need [`uv`](https://github.com/astral-sh/uv)
+for the Python sidecar.
+
+```bash
+npm install
+npm run tauri dev      # dev with hot reload
+npm run tauri build    # Lucida.app in src-tauri/target/release/bundle/macos/
+
+# only for the experiments (local model, listening) — then point the
+# settings' "Folder for local models" at sidecar/:
+uv venv --python 3.12 sidecar/.venv
+uv pip install --python sidecar/.venv/bin/python mlx-lm
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LUCIDA_BOARD_PORT` | `8767` | board API port (agents, MCP) |
+| `LUCIDA_WIKI` | the folder open in Lucida | default folder for the MCP `plan_board` / `company_map` tools |
+| `LUCIDA_MANAGED_SETTINGS` | `/Library/Application Support/Lucida/defaults.json` | managed defaults (see above) |
+| `LUCIDA_AI_MODEL` | `mlx-community/Qwen2.5-3B-Instruct-4bit` | local model for the Suggestions experiment |
+| `LUCIDA_AI_DIR` | `~/Library/Application Support/Lucida/sidecar` | folder holding `serve.sh` and the `.venv` (the settings override it) |
+
+## Tests
+
+```bash
+npm test
+```
+
+Pure-logic tests, no app and no network: shape recognition, model-output
+parsing, the poster and company-map layouts, the plan files (a patch keeps
+everything it did not touch; every gesture on the wall becomes exactly one file
+change, in both looks), and the MCP handshake. They run on a fictional plan;
+point `LUCIDA_TEST_WIKI` at a wiki folder to check a real one.
+
+## Project layout
+
+```
+src/
+  App.tsx                  shell: settings, folder, keyboard, board API wiring
+  components/
+    Whiteboard.tsx         the canvas: pictures, proposals, live map and plan wall
+    SettingsDialog.tsx     ⌘,
+    WelcomeHint.tsx        the first-run hint
+    PlanInspector.tsx      the panel for one plan card
+  lib/
+    ai.ts                  model calls (pictures, suggestions), ZDR routing
+    settings.ts            the settings file, managed defaults, locked keys
+    i18n.ts                every visible word, German and English
+    house.ts               the organisation's colours from one accent
+    plan.ts                plan files: parse, patch, clean layout, read the board back
+    heist.ts               the plan wall's cork-board look
+    masterplan.ts          the infographic poster
+    companyMap.ts          wiki → company map
+    boardApi.ts            the webview half of the board API
+    recognizer.ts          freehand stroke → clean shape
+src-tauri/src/
+  lib.rs                   files, settings, Keychain, sidecars
+  board_api.rs             the board API on :8767
+mcp/server.mjs             the MCP server
+scripts/demo.ts            npm run demo
+scratch/                   tests and the fictional fixture
+```
 
 ## Contributing
 
